@@ -8,6 +8,7 @@ import (
   "os/exec"
   "strings"
   "sync"
+  "syscall"
 )
 
 var (
@@ -99,7 +100,7 @@ func playLooper(){
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
       loggear("[PLAYER] Reproduciendo " + FirehousePath + mensaje.Payload + " con " + cmdString + ".")
-      err := handler.Start()
+      err := handler.CombinedOutput()
       if err != nil {
         loggearError(err.Error())
 	panic(err)
@@ -125,7 +126,7 @@ func stopLooper(){
       if err != nil {
         loggearError(err.Error())
       }
-      proceso.Kill()
+      err := proceso.Signal(syscall.SIGTERM)
       VLCpid = 0
     } else {
       loggear("[PLAYER] Se intentó cerrar una instancia de VLC pero no existe una disponible.")
