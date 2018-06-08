@@ -6,6 +6,7 @@ import (
   "log"
   "os"
   "os/exec"
+  "strconv"
   "strings"
   "sync"
   "syscall"
@@ -101,7 +102,8 @@ func playLooper(){
     } else {
       loggear("[PLAYER] Reproduciendo " + FirehousePath + "/" + mensaje.Payload + " con " + cmdString + ".")
       _, err := handler.CombinedOutput()
-      loggear("[PLAYER] El PID de VLC es: " + handler.Process.Pid)
+      sPID := strconv.Itoa(handler.Process.Pid)
+      loggear("[PLAYER] El PID de VLC es: " + sPID)
       if err != nil {
         loggearError(err.Error())
 	panic(err)
@@ -129,7 +131,8 @@ func stopLooper(){
       }
       estado, errW := proceso.Wait()
       if estado.Exited() {
-        loggear("[PLAYER] El proceso con PID " + VLCpid + " ya había terminado." )
+	sPID := strconv.Itoa(VLCpid)
+        loggear("[PLAYER] El proceso con PID " + sPID + " ya había terminado." )
         VLCpid = 0
       } else {
         errN := proceso.Signal(syscall.SIGTERM)
