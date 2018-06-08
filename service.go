@@ -126,7 +126,11 @@ func stopLooper(){
       if err != nil {
         loggearError(err.Error())
       }
-      err := proceso.Signal(syscall.SIGTERM)
+      errN := proceso.Signal(syscall.SIGTERM)
+      if errN != nil {
+        loggearError(errN.Error())
+	panic(err)
+      }
       VLCpid = 0
     } else {
       loggear("[PLAYER] Se intentó cerrar una instancia de VLC pero no existe una disponible.")
