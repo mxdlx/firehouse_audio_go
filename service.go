@@ -62,7 +62,7 @@ func clienteRedis() *redis.Client {
 
   _, err := client.Ping().Result()
   if err != nil {
-    fmt.Println("[ERROR] No se pudo conectar al servidor de Redis.")
+    loggearError("[REDIS] No se pudo conectar al servidor de Redis.")
     panic(err)
   }
 
@@ -79,7 +79,7 @@ func playLooper(){
     // Mensaje publicado
     mensaje, err := PubSubPlay.ReceiveMessage()
     if err != nil {
-      loggearError(err.Error())
+      loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
       panic(err)
     }
     loggear("[REDIS] " + mensaje.String())
@@ -102,12 +102,12 @@ func playLooper(){
     } else {
       loggear("[PLAYER] Reproduciendo " + FirehousePath + "/" + mensaje.Payload + " con " + cmdString + ".")
       _, err := handler.CombinedOutput()
-      sPID := strconv.Itoa(handler.Process.Pid)
-      loggear("[PLAYER] El PID de VLC es: " + sPID)
       if err != nil {
-        loggearError(err.Error())
+        loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
 	panic(err)
       }
+      sPID := strconv.Itoa(handler.Process.Pid)
+      loggear("[PLAYER] El PID de VLC es: " + sPID)
       VLCpid = handler.Process.Pid
     }
   }
@@ -118,7 +118,7 @@ func stopLooper(){
     // Mensaje publicado
     mensaje, err := PubSubStop.ReceiveMessage()
     if err != nil {
-      loggearError(err.Error())
+      loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
       panic(err)
     }
     loggear("[REDIS] " + mensaje.String())
@@ -127,27 +127,29 @@ func stopLooper(){
     if VLCpid > 0 {
       proceso, errFP := os.FindProcess(VLCpid)
       if errFP != nil {
-        loggearError(errFP.Error())
-      }
-      estado, errW := proceso.Wait()
-      if errW != nil {
-        loggearError(errW.Error())
-	panic(err)
-      }
-      if estado.Exited() {
-	sPID := strconv.Itoa(VLCpid)
-        loggear("[PLAYER] El proceso con PID " + sPID + " ya había terminado." )
-        VLCpid = 0
+        loggearError("[STOPPER] No se encontró un proceso para terminar. Sistema dice: " + errFP.Error() + ".")
       } else {
-        errN := proceso.Signal(syscall.SIGTERM)
-        if errN != nil {
-          loggearError(errN.Error())
-	  panic(err)
-        }
-        VLCpid = 0
+        estado, errW := proceso.Wait()
+	sPID := strconv.Itoa(proceso.Pid)
+        if errW != nil {
+	  loggearError("[STOPPER] No se pudo terminar el proceso " + sPID + ". Sistema dice: " + errW.Error() + ".")
+        } else {
+          if estado.Exited() {
+            loggear("[STOPPER] El proceso con PID " + sPID + " ya había terminado." )
+            VLCpid = 0
+          } else {
+            errN := proceso.Signal(syscall.SIGTERM)
+            if errN != nil {
+	      loggearError("No se pudo enviar la señal SIGTERM. Sistema dice: " + errN.Error() + ".")
+	    } else {
+	      loggear("Se envío la señal SIGTERM, el proceso " + sPID + " debería haber terminado.")
+              VLCpid = 0
+	    }
+          }
+	}
       }
     } else {
-      loggear("[PLAYER] Se intentó cerrar una instancia de VLC pero no existe una disponible.")
+      VLCpid = 0
     }
   }
 }
