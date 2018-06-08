@@ -85,7 +85,7 @@ func playLooper(){
 
     // El path del archivo está definido por firehouse_path y el payload del mensaje publicado
     // Por ejemplo: /firehouse/uploads/intervention_type/audio/1/01_archivo.mp3
-    handler := exec.Command("cvlc", FirehousePath + mensaje.Payload,
+    handler := exec.Command("cvlc", FirehousePath + "/" + mensaje.Payload,
                             "--play-and-exit",
 		            "--sout='#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000, mux=raw, caching=10}'",
 		            "--no-sout-rtp-sap",
@@ -99,8 +99,9 @@ func playLooper(){
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
-      loggear("[PLAYER] Reproduciendo " + FirehousePath + mensaje.Payload + " con " + cmdString + ".")
+      loggear("[PLAYER] Reproduciendo " + FirehousePath + "/" + mensaje.Payload + " con " + cmdString + ".")
       _, err := handler.CombinedOutput()
+      loggear("[PLAYER] El PID de VLC es: " + handler.Process.Pid)
       if err != nil {
         loggearError(err.Error())
 	panic(err)
@@ -122,16 +123,22 @@ func stopLooper(){
 
     // Cierro todas las instancias
     if VLCpid > 0 {
-      proceso, err := os.FindProcess(VLCpid)
-      if err != nil {
-        loggearError(err.Error())
+      proceso, errFP := os.FindProcess(VLCpid)
+      if errFP != nil {
+        loggearError(errFP.Error())
       }
-      errN := proceso.Signal(syscall.SIGTERM)
-      if errN != nil {
-        loggearError(errN.Error())
-	panic(err)
+      estado, errW := proceso.Wait()
+      if estado.Exited() {
+        loggear("[PLAYER] El proceso con PID " + VLCpid + " ya había terminado." )
+        VLCpid = 0
+      } else {
+        errN := proceso.Signal(syscall.SIGTERM)
+        if errN != nil {
+          loggearError(errN.Error())
+	  panic(err)
+        }
+        VLCpid = 0
       }
-      VLCpid = 0
     } else {
       loggear("[PLAYER] Se intentó cerrar una instancia de VLC pero no existe una disponible.")
     }
