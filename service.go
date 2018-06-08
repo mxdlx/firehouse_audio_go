@@ -98,7 +98,7 @@ func playLooper(){
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
-      loggear("[PLAYER] Reproduciendo " + FirehousePath + mensaje.Payload + " con " cmdString + ".")
+      loggear("[PLAYER] Reproduciendo " + FirehousePath + mensaje.Payload + " con " + cmdString + ".")
       err := handler.Start()
       if err != nil {
         loggearError(err.Error())
