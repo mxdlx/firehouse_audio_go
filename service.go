@@ -130,6 +130,10 @@ func stopLooper(){
         loggearError(errFP.Error())
       }
       estado, errW := proceso.Wait()
+      if errW != nil {
+        loggearError(errW.Error())
+	panic(err)
+      }
       if estado.Exited() {
 	sPID := strconv.Itoa(VLCpid)
         loggear("[PLAYER] El proceso con PID " + sPID + " ya había terminado." )
