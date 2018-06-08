@@ -124,6 +124,7 @@ func stopLooper(){
 
     // Cierro todas las instancias
     if VLCpid > 0 {
+      loggear("[STOPPER] Intentado cerrar instancias de VLC.")
       proceso, errFP := os.FindProcess(VLCpid)
       if errFP != nil {
         loggearError("[STOPPER] No se encontró un proceso para terminar. Sistema dice: " + errFP.Error() + ".")
@@ -131,7 +132,7 @@ func stopLooper(){
         estado, errW := proceso.Wait()
 	sPID := strconv.Itoa(proceso.Pid)
         if errW != nil {
-	  loggearError("[STOPPER] No se pudo terminar el proceso " + sPID + ". Sistema dice: " + errW.Error() + ".")
+	  loggearError("[STOPPER] No se pudo terminar el proceso " + sPID + ", ya debe haber terminado. Sistema dice: " + errW.Error() + ".")
         } else {
           if estado.Exited() {
             loggear("[STOPPER] El proceso con PID " + sPID + " ya había terminado." )
@@ -148,6 +149,7 @@ func stopLooper(){
 	}
       }
     } else {
+      loggear("[STOPPER] No hay instancias para terminar.")
       VLCpid = 0
     }
   }
