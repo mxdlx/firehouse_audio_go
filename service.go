@@ -85,28 +85,31 @@ func playLooper(){
 
     // El path del archivo está definido por firehouse_path y el payload del mensaje publicado
     // Por ejemplo: /firehouse/uploads/intervention_type/audio/1/01_archivo.mp3
-    handler := exec.Command("cvlc", FirehousePath + "/" + mensaje.Payload,
+    var file, sout string
+    file = FirehousePath + mensaje.Payload
+    sout = "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10}"
+
+    handler := exec.Command("cvlc", file,
                             "--play-and-exit",
-		            "--sout='#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000, mux=raw, caching=10}'",
+		            sout,
 		            "--no-sout-rtp-sap",
 		            "--no-sout-standard-sap",
 		            "--ttl=1",
 		            "--sout-keep",
 		            "--sout-mux-caching=10")
-    cmdString := strings.Join(handler.Args[:], " ")
 
     // Verifico si existe ya una instancia
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
-      loggear("[PLAYER] Reproduciendo " + FirehousePath + "/" + mensaje.Payload + " con " + cmdString + ".")
-      _, err := handler.CombinedOutput()
+      std, err := handler.CombinedOutput()
+      loggear("[PLAYER] Reproduciendo " + file + " con " + cmdString := strings.Join(handler.Args[:], " ") + ".")
+      loggear("[PLAYER] El output de VLC es: " + string(std[:]) + ".")
       if err != nil {
         loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
 	panic(err)
       }
-      sPID := strconv.Itoa(handler.Process.Pid)
-      loggear("[PLAYER] El PID de VLC es: " + sPID)
+      loggear("[PLAYER] El PID de VLC es: " + strconv.Itoa(handler.Process.Pid))
       VLCpid = handler.Process.Pid
     }
   }
@@ -128,24 +131,15 @@ func stopLooper(){
       proceso, errFP := os.FindProcess(VLCpid)
       if errFP != nil {
         loggearError("[STOPPER] No se encontró un proceso para terminar. Sistema dice: " + errFP.Error() + ".")
+	VLCpid = 0
       } else {
-        estado, errW := proceso.Wait()
-	sPID := strconv.Itoa(proceso.Pid)
-        if errW != nil {
-	  loggearError("[STOPPER] No se pudo terminar el proceso " + sPID + ", ya debe haber terminado. Sistema dice: " + errW.Error() + ".")
-        } else {
-          if estado.Exited() {
-            loggear("[STOPPER] El proceso con PID " + sPID + " ya había terminado." )
-            VLCpid = 0
-          } else {
-            errN := proceso.Signal(syscall.SIGTERM)
-            if errN != nil {
-	      loggearError("No se pudo enviar la señal SIGTERM. Sistema dice: " + errN.Error() + ".")
-	    } else {
-	      loggear("Se envío la señal SIGTERM, el proceso " + sPID + " debería haber terminado.")
-              VLCpid = 0
-	    }
-          }
+        errN := proceso.Signal(syscall.SIGTERM)
+        if errN != nil {
+	  loggearError("No se pudo enviar la señal SIGTERM. Sistema dice: " + errN.Error() + ".")
+	  VLCpid = 0
+	} else {
+	  loggear("Se envío la señal SIGTERM, el resultado es: " + errN.Error() + ".")
+          VLCpid = 0
 	}
       }
     } else {
