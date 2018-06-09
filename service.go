@@ -102,9 +102,8 @@ func playLooper(){
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
-      std, err := handler.CombinedOutput()
+      err := handler.Start()
       loggear("[PLAYER] Reproduciendo " + file + " con " + strings.Join(handler.Args[:], " ") + ".")
-      loggear("[PLAYER] El output de VLC es: " + string(std[:]) + ".")
       if err != nil {
         loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
 	panic(err)
@@ -127,7 +126,7 @@ func stopLooper(){
 
     // Cierro todas las instancias
     if VLCpid > 0 {
-      loggear("[STOPPER] Intentado cerrar instancias de VLC.")
+      loggear("[STOPPER] Intentado cerrar instancia de VLC con PID: " + strconv.Itoa(VLCpid))
       proceso, errFP := os.FindProcess(VLCpid)
       if errFP != nil {
         loggearError("[STOPPER] No se encontró un proceso para terminar. Sistema dice: " + errFP.Error() + ".")
