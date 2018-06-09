@@ -87,7 +87,7 @@ func playLooper(){
     // Por ejemplo: /firehouse/uploads/intervention_type/audio/1/01_archivo.mp3
     var file, sout string
     file = FirehousePath + mensaje.Payload
-    sout = "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10}"
+    sout = "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10,mux=raw}"
 
     handler := exec.Command("cvlc", file,
                             "--play-and-exit",
