@@ -103,7 +103,7 @@ func playLooper(){
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
       std, err := handler.CombinedOutput()
-      loggear("[PLAYER] Reproduciendo " + file + " con " + cmdString := strings.Join(handler.Args[:], " ") + ".")
+      loggear("[PLAYER] Reproduciendo " + file + " con " + strings.Join(handler.Args[:], " ") + ".")
       loggear("[PLAYER] El output de VLC es: " + string(std[:]) + ".")
       if err != nil {
         loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
