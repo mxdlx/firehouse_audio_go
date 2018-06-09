@@ -137,7 +137,7 @@ func stopLooper(){
 	  loggearError("No se pudo enviar la señal SIGTERM. Sistema dice: " + errN.Error() + ".")
 	  VLCpid = 0
 	} else {
-	  loggear("Se envío la señal SIGTERM, el resultado es: " + errN.Error() + ".")
+	  loggear("Se envío la señal SIGTERM.")
           VLCpid = 0
 	}
       }
