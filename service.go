@@ -102,6 +102,10 @@ func playLooper(){
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
+      errR := PubSubPlay.Publish("start-broadcast", "Iniciar Broadcast").Err() 
+      if errR != nil {
+        loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
+      }
       err := handler.Start()
       loggear("[PLAYER] Reproduciendo " + file + " con " + strings.Join(handler.Args[:], " ") + ".")
       if err != nil {
