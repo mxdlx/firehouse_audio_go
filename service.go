@@ -161,11 +161,11 @@ func stopLooper(){
           VLCpid = 0
 	}
       }
+      stopBroadcast()
     } else {
       loggear("[STOPPER] No hay instancias para terminar.")
       VLCpid = 0
     }
-    stopBroadcast()
   }
 }
 
