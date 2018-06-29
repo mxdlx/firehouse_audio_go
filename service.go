@@ -9,6 +9,7 @@ import (
   "strings"
   "sync"
   "syscall"
+  "time"
 )
 
 var (
@@ -73,6 +74,24 @@ func subscribir() {
   PubSubStop = ClienteStop.Subscribe("force-stop-broadcast")
 }
 
+func startBroadcast(){
+  loggear("[REDIS] Publicando mensaje en start-broadcast")
+  time.Sleep(2 * time.Second)
+  err := ClientePlay.Publish("start-broadcast", "Iniciar Broadcast").Err()
+  if err != nil {
+    loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
+  }
+}
+
+func stopBroadcast(){
+  loggear("[REDIS] Publicando mensaje en stop-broadcast")
+  time.Sleep(2 * time.Second)
+  err := ClienteStop.Publish("stop-broadcast", "Detener Broadcast").Err()
+  if err != nil {
+    loggearError("[STOPPER] Hubo un error al publicar un mensaje en stop-broadcast.")
+  }
+}
+
 func playLooper(){
   for {
     // Mensaje publicado
@@ -102,10 +121,7 @@ func playLooper(){
     if VLCpid > 0 {
       loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
     } else {
-      errR := ClientePlay.Publish("start-broadcast", "Iniciar Broadcast").Err() 
-      if errR != nil {
-        loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
-      }
+      startBroadcast()
       err := handler.Start()
       loggear("[PLAYER] Reproduciendo " + file + " con " + strings.Join(handler.Args[:], " ") + ".")
       if err != nil {
@@ -149,6 +165,7 @@ func stopLooper(){
       loggear("[STOPPER] No hay instancias para terminar.")
       VLCpid = 0
     }
+    stopBroadcast()
   }
 }
 
