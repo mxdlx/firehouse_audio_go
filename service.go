@@ -76,7 +76,6 @@ func subscribir() {
 
 func startBroadcast(){
   loggear("[REDIS] Publicando mensaje en start-broadcast")
-  time.Sleep(2 * time.Second)
   err := ClientePlay.Publish("start-broadcast", "Iniciar Broadcast").Err()
   if err != nil {
     loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
