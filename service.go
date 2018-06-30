@@ -2,13 +2,11 @@ package main
 
 import (
   "github.com/go-redis/redis"
+  "io"
   "log"
   "os"
   "os/exec"
-  "strconv"
-  "strings"
   "sync"
-  "syscall"
   "time"
 )
 
@@ -21,11 +19,12 @@ var (
   ServiceLogPath = LogPath + "/audioplayer.log"
   ErrorLog *log.Logger
   ErrorLogPath = LogPath + "/audioplayer.error"
+  VLCLogPath = LogPath + "/vlc.log"
+  StdinVLC io.WriteCloser
   ClientePlay = clienteRedis()
   ClienteStop = clienteRedis()
   PubSubPlay *redis.PubSub
   PubSubStop *redis.PubSub
-  VLCpid int
 )
 
 func init() {
@@ -44,6 +43,7 @@ func init() {
   }
 
   ErrorLog = log.New(fileHandlerE, "[ERROR] ", log.Ldate|log.Ltime)
+
 }
 
 func loggear(mensaje string) {
@@ -91,6 +91,36 @@ func stopBroadcast(){
   }
 }
 
+func vlcLoader(){
+  sout := "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10,mux=raw}"
+  handler := exec.Command("cvlc",
+                          "-I",
+			  "oldrc",
+			  "--rc-fake-tty",
+			  "--file-logging",
+			  "--logfile",
+			  VLCLogPath,
+			  "--log-verbose",
+			  "2",
+			  sout,
+			  "--no-sout-rtp-sap",
+			  "--no-sout-standard-sap",
+			  "--ttl=1",
+			  "--sout-keep",
+			  "--sout-mux-caching=10")
+
+  // Necesito compartir StdinVLC
+  var err error
+  StdinVLC, err = handler.StdinPipe()
+
+  handler.Start()
+
+  if err != nil {
+    loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
+    panic(err)
+  }
+}
+
 func playLooper(){
   for {
     // Mensaje publicado
@@ -101,35 +131,14 @@ func playLooper(){
     }
     loggear("[REDIS] " + mensaje.String())
 
-    // El path del archivo está definido por firehouse_path y el payload del mensaje publicado
-    // Por ejemplo: /firehouse/uploads/intervention_type/audio/1/01_archivo.mp3
-    var file, sout string
-    file = FirehousePath + mensaje.Payload
-    sout = "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10,mux=raw}"
+    // URI del archivo para VLC
+    file := "file:// " + FirehousePath + mensaje.Payload
 
-    handler := exec.Command("cvlc", file,
-                            "--play-and-exit",
-		            sout,
-		            "--no-sout-rtp-sap",
-		            "--no-sout-standard-sap",
-		            "--ttl=1",
-		            "--sout-keep",
-		            "--sout-mux-caching=10")
+    startBroadcast()
 
-    // Verifico si existe ya una instancia
-    if VLCpid > 0 {
-      loggear("[PLAYER] Se intentó iniciar una instancia de VLC pero ya existe por lo menos una.")
-    } else {
-      startBroadcast()
-      err := handler.Start()
-      loggear("[PLAYER] Reproduciendo " + file + " con " + strings.Join(handler.Args[:], " ") + ".")
-      if err != nil {
-        loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
-	panic(err)
-      }
-      loggear("[PLAYER] El PID de VLC es: " + strconv.Itoa(handler.Process.Pid))
-      VLCpid = handler.Process.Pid
-    }
+    loggear("[PLAYER] Agregando " + FirehousePath + mensaje.Payload + " a la playlist de VLC.")
+    loggear("[PLAYER] Intentando reproducir " + FirehousePath + mensaje.Payload)
+    io.WriteString(StdinVLC, "add " + file + "\n")
   }
 }
 
@@ -143,39 +152,19 @@ func stopLooper(){
     }
     loggear("[REDIS] " + mensaje.String())
 
-    // Cierro todas las instancias
-    if VLCpid > 0 {
-      loggear("[STOPPER] Intentado cerrar instancia de VLC con PID: " + strconv.Itoa(VLCpid))
-      proceso, errFP := os.FindProcess(VLCpid)
-      if errFP != nil {
-        loggearError("[STOPPER] No se encontró un proceso para terminar. Sistema dice: " + errFP.Error() + ".")
-	VLCpid = 0
-      } else {
-        errN := proceso.Signal(syscall.SIGTERM)
-        if errN != nil {
-	  loggearError("No se pudo enviar la señal SIGTERM. Sistema dice: " + errN.Error() + ".")
-	  VLCpid = 0
-	} else {
-	  loggear("Se envío la señal SIGTERM.")
-          VLCpid = 0
-	}
-      }
-      stopBroadcast()
-    } else {
-      loggear("[STOPPER] No hay instancias para terminar.")
-      VLCpid = 0
-    }
+    loggear("[STOPPER] Deteniendo playlist de VLC.")
+    io.WriteString(StdinVLC, "stop\n")
   }
 }
 
 func main() {
 
   var wg sync.WaitGroup
-  wg.Add(2)
+  wg.Add(3)
 
-  loggear("Iniciando Servicio de Broadcast con VLC...")
   subscribir()
 
+  go vlcLoader()
   go playLooper()
   go stopLooper()
 
