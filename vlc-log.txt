@@ -1,4 +1,0 @@
-﻿-- logger module started --
-main error: no suitable interface module
-main error: interface "default" initialization failed
--- logger module stopped --
