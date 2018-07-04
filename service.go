@@ -75,7 +75,7 @@ func subscribir() {
 }
 
 func startBroadcast(){
-  loggear("[REDIS] Publicando mensaje en start-broadcast")
+  loggear("[REDIS] Publicando mensaje en start-broadcast.")
   err := ClientePlay.Publish("start-broadcast", "Iniciar Broadcast").Err()
   if err != nil {
     loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
@@ -83,7 +83,7 @@ func startBroadcast(){
 }
 
 func stopBroadcast(){
-  loggear("[REDIS] Publicando mensaje en stop-broadcast")
+  loggear("[REDIS] Publicando mensaje en stop-broadcast.")
   time.Sleep(2 * time.Second)
   err := ClienteStop.Publish("stop-broadcast", "Detener Broadcast").Err()
   if err != nil {
@@ -92,6 +92,7 @@ func stopBroadcast(){
 }
 
 func vlcLoader(){
+  loggear("[PLAYER] Iniciando instancia de VLC.")
   sout := "--sout=#transcode{vcodec=none,acodec=mp3}:udp{dst=" + BroadcastIP + ":8000,caching=10,mux=raw}"
   handler := exec.Command("cvlc",
                           "-I",
@@ -129,7 +130,7 @@ func playLooper(){
       loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
       panic(err)
     }
-    loggear("[REDIS] " + mensaje.String())
+    loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
 
     // URI del archivo para VLC
     file := "file:// " + FirehousePath + mensaje.Payload
@@ -150,7 +151,7 @@ func stopLooper(){
       loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
       panic(err)
     }
-    loggear("[REDIS] " + mensaje.String())
+    loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
 
     loggear("[STOPPER] Deteniendo playlist de VLC.")
     io.WriteString(StdinVLC, "stop\n")
@@ -162,6 +163,7 @@ func main() {
   var wg sync.WaitGroup
   wg.Add(3)
 
+  loggear("Iniciando Servicio de Broadcast con VLC...")
   subscribir()
 
   go vlcLoader()
