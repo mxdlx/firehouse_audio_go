@@ -1,6 +1,7 @@
 package main
 
 import (
+  "bytes"
   "github.com/go-redis/redis"
   "io"
   "log"
@@ -21,6 +22,7 @@ var (
   ErrorLogPath = LogPath + "/audioplayer.error"
   VLCLogPath = LogPath + "/vlc.log"
   StdinVLC io.WriteCloser
+  StdoutVLC io.ReadCloser
   ClientePlay = clienteRedis()
   ClienteStop = clienteRedis()
   PubSubPlay *redis.PubSub
@@ -111,8 +113,9 @@ func vlcLoader(){
 			  "--sout-mux-caching=10")
 
   // Necesito compartir StdinVLC
-  var err error
-  StdinVLC, err = handler.StdinPipe()
+  var err1, err2 error
+  StdinVLC, err1 = handler.StdinPipe()
+  StdoutVLC, err2 = handler.StdoutPipe()
 
   handler.Start()
 
@@ -153,8 +156,17 @@ func stopLooper(){
     }
     loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
 
-    loggear("[STOPPER] Deteniendo playlist de VLC.")
-    io.WriteString(StdinVLC, "stop\n")
+    io.WriteString(StdinVLC, "is_playing\n")
+    buf := new(bytes.Buffer)
+    buf.ReadFrom(StdoutVLC)
+
+    if buf.String() == "1" {
+      loggear("[STOPPER] Deteniendo playlist de VLC.")
+      io.WriteString(StdinVLC, "stop\n")
+      stopBroadcast()
+    } else {
+      loggear("[STOPPER] No hay elementos en reproduccion.")
+    }
   }
 }
 
