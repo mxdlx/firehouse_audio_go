@@ -71,7 +71,7 @@ func clienteRedis() *redis.Client {
 
 func subscribir() {
   PubSubPlay = ClientePlay.Subscribe("interventions:play_audio_file")
-  PubSubStop = ClienteStop.Subscribe("stop-broadcast, force-stop-broadcast")
+  PubSubStop = ClienteStop.Subscribe("stop-broadcast", "force-stop-broadcast")
 }
 
 func startBroadcast(){
