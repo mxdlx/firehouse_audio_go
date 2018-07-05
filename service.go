@@ -69,8 +69,14 @@ func newPool() *redis.Pool {
 }
 
 func subscribir(){
-  PubSubPlay.Subscribe("interventions:play_audio_file")
-  PubSubStop.Subscribe("stop-broadcast")
+  err1 := PubSubPlay.Subscribe("interventions:play_audio_file")
+  if err1 != nil {
+    loggear("FAIL TO SUBSCRIBE TO INTERVENTIONS!")
+  }
+  err2 := PubSubStop.Subscribe("stop-broadcast")
+  if err2 != nil {
+    loggear("FAIL TO SUBSCRIBE TO INTERVENTIONS!")
+  }
 }
 
 func startBroadcast(){
