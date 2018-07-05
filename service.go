@@ -65,15 +65,6 @@ func connRedis() redis.Conn {
   return c
 }
 
-func startBroadcast(){
-  c := connRedis()
-  loggear("[PLAYER] Estoy en startBroadcast!")
-  loggear("[REDIS] Publicando mensaje en start-broadcast.")
-  time.Sleep(2 * time.Second)
-  c.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
-  defer c.Close()
-}
-
 func stopBroadcast(){
   c := connRedis()
   loggear("[PLAYER] Estoy en stopBroadcast!")
@@ -121,7 +112,11 @@ func playLooper(){
         // URI del archivo para VLC
         file := "file://" + FirehousePath + payload
 
-        startBroadcast()
+        start := connRedis()
+        loggear("[REDIS] Publicando mensaje en start-broadcast.")
+        time.Sleep(1 * time.Second)
+        start.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
+        defer start.Close()
 
         loggear("[PLAYER] Agregando " + FirehousePath + payload + " a la playlist de VLC.")
         loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
