@@ -69,6 +69,7 @@ func startBroadcast(){
   c := connRedis()
   loggear("[PLAYER] Estoy en startBroadcast!")
   loggear("[REDIS] Publicando mensaje en start-broadcast.")
+  time.Sleep(1 * time.Second)
   c.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
   defer c.Close()
 }
