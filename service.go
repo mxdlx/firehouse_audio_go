@@ -128,6 +128,7 @@ func playLooper(){
         loggear("[PLAYER] Agregando " + FirehousePath + payload + " a la playlist de VLC.")
         loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
         io.WriteString(StdinVLC, "add " + file + "\n")
+	break
     }
   }
 }
@@ -161,6 +162,7 @@ func stopLooper(){
           io.WriteString(StdinVLC, "stop\n")
           stopBroadcast()
         }
+	break
     }
   }
 }
