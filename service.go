@@ -77,15 +77,25 @@ func subscribir() {
 }
 
 func startBroadcast(){
+  loggear("[PLAYER] Estoy en startBroadcast!")
+  errPre := ConnPlay.Flush()
+  if errPre != nil {
+    loggearError("[PLAYER] Hubo un error al hacer Flush().")
+  }
   loggear("[REDIS] Publicando mensaje en start-broadcast.")
   ConnPlay.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
-  err := ConnPlay.Flush()
-  if err != nil {
+  errPost := ConnPlay.Flush()
+  if errPost != nil {
     loggearError("[PLAYER] Hubo un error al hacer Flush().")
   }
 }
 
 func stopBroadcast(){
+  loggear("[PLAYER] Estoy en stopBroadcast!")
+  errPre := ConnStop.Flush()
+  if errPre != nil {
+    loggearError("[STOPPER] Hubo un error al hacer Flush().")
+  }
   loggear("[REDIS] Publicando mensaje en stop-broadcast.")
   time.Sleep(2 * time.Second)
   ConnStop.Send("PUBLISH", "stop-broadcast","Detener Broadcast")
