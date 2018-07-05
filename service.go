@@ -24,10 +24,6 @@ var (
   VLCLogPath = LogPath + "/vlc.log"
   StdinVLC io.WriteCloser
   StdoutVLC io.ReadCloser
-  ConnPlay = connRedis()
-  ConnStop = connRedis()
-  PubSubPlay redis.PubSubConn
-  PubSubStop redis.PubSubConn
 )
 
 func init() {
@@ -69,40 +65,21 @@ func connRedis() redis.Conn {
   return c
 }
 
-func subscribir() {
-  PubSubPlay = redis.PubSubConn{Conn: ConnPlay}
-  PubSubPlay.Subscribe("interventions:play_audio_file")
-  PubSubStop = redis.PubSubConn{Conn: ConnStop}
-  PubSubStop.Subscribe("stop-broadcast", "force-stop-broadcast")
-}
-
 func startBroadcast(){
+  c := connRedis()
   loggear("[PLAYER] Estoy en startBroadcast!")
-  errPre := ConnPlay.Flush()
-  if errPre != nil {
-    loggearError("[PLAYER] Hubo un error al hacer Flush().")
-  }
   loggear("[REDIS] Publicando mensaje en start-broadcast.")
-  ConnPlay.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
-  errPost := ConnPlay.Flush()
-  if errPost != nil {
-    loggearError("[PLAYER] Hubo un error al hacer Flush().")
-  }
+  c.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
+  defer c.Close()
 }
 
 func stopBroadcast(){
+  c := connRedis()
   loggear("[PLAYER] Estoy en stopBroadcast!")
-  errPre := ConnStop.Flush()
-  if errPre != nil {
-    loggearError("[STOPPER] Hubo un error al hacer Flush().")
-  }
   loggear("[REDIS] Publicando mensaje en stop-broadcast.")
   time.Sleep(2 * time.Second)
-  ConnStop.Send("PUBLISH", "stop-broadcast","Detener Broadcast")
-  err := ConnStop.Flush()
-  if err != nil {
-    loggearError("[STOPPER] Hubo un error al hacer Flush().")
-  }
+  c.Send("PUBLISH", "stop-broadcast","Detener Broadcast")
+  defer c.Close()
 }
 
 func vlcLoader(){
@@ -131,6 +108,9 @@ func vlcLoader(){
 }
 
 func playLooper(){
+  c := connRedis()
+  PubSubPlay := redis.PubSubConn{Conn: c}
+  PubSubPlay.Subscribe("interventions:play_audio_file")
   for {
     switch m := PubSubPlay.Receive().(type) {
       case redis.Message:
@@ -147,9 +127,13 @@ func playLooper(){
         io.WriteString(StdinVLC, "add " + file + "\n")
     }
   }
+  defer c.Close()
 }
 
 func stopLooper(){
+  c := connRedis()
+  PubSubStop := redis.PubSubConn{Conn: c}
+  PubSubStop.Subscribe("stop-broadcast", "force-stop-broadcast")
   for {
     switch m := PubSubStop.Receive().(type) {
       case redis.Message:
@@ -180,6 +164,7 @@ func stopLooper(){
         }
     }
   }
+  defer c.Close()
 }
 
 func main() {
@@ -188,7 +173,6 @@ func main() {
   wg.Add(3)
 
   loggear("Iniciando Servicio de Broadcast con VLC...")
-  subscribir()
 
   go vlcLoader()
   go playLooper()
