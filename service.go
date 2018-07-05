@@ -179,6 +179,7 @@ func main() {
   wg.Add(3)
 
   loggear("Iniciando Servicio de Broadcast con VLC...")
+  subscribir()
 
   go vlcLoader()
   go playLooper()
