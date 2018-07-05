@@ -82,7 +82,6 @@ func subscribir(){
 func startBroadcast(){
   c := Piletazo.Get()
   loggear("[REDIS] Publicando mensaje en start-broadcast.")
-  time.Sleep(2 * time.Second)
   c.Send("PUBLISH", "start-broadcast","Bravo Victor")
   defer c.Close()
 }
