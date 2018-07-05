@@ -2,7 +2,7 @@ package main
 
 import (
   "bufio"
-  "github.com/go-redis/redis"
+  "github.com/gomodule/redigo/redis"
   "io"
   "log"
   "os"
@@ -24,10 +24,10 @@ var (
   VLCLogPath = LogPath + "/vlc.log"
   StdinVLC io.WriteCloser
   StdoutVLC io.ReadCloser
-  ClientePlay = clienteRedis()
-  ClienteStop = clienteRedis()
-  PubSubPlay *redis.PubSub
-  PubSubStop *redis.PubSub
+  ConnPlay = connRedis()
+  ConnStop = connRedis()
+  PubSubPlay redis.PubSubConn
+  PubSubStop redis.PubSubConn
 )
 
 func init() {
@@ -57,40 +57,41 @@ func loggearError(mensaje string) {
   ErrorLog.Output(0, mensaje)
 }
 
-func clienteRedis() *redis.Client {
+func connRedis() redis.Conn {
   // Necesito tener esto acá por utilizar el cliente como una var
-  client := redis.NewClient(&redis.Options{
-	  Addr: RedisHost + ":6379",
-  })
-
-  _, err := client.Ping().Result()
+  c, err := redis.Dial("tcp", RedisHost + ":6379")
   if err != nil {
     loggearError("[REDIS] No se pudo conectar al servidor de Redis.")
     panic(err)
   }
+  //defer c.Close()
 
-  return client
+  return c
 }
 
 func subscribir() {
-  PubSubPlay = ClientePlay.Subscribe("interventions:play_audio_file")
-  PubSubStop = ClienteStop.Subscribe("stop-broadcast", "force-stop-broadcast")
+  PubSubPlay = redis.PubSubConn{Conn: ConnPlay}
+  PubSubPlay.Subscribe("interventions:play_audio_file")
+  PubSubStop = redis.PubSubConn{Conn: ConnStop}
+  PubSubStop.Subscribe("stop-broadcast", "force-stop-broadcast")
 }
 
 func startBroadcast(){
   loggear("[REDIS] Publicando mensaje en start-broadcast.")
-  err := ClientePlay.Publish("start-broadcast", "Iniciar Broadcast").Err()
+  ConnPlay.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
+  err := ConnPlay.Flush()
   if err != nil {
-    loggearError("[PLAYER] Hubo un error al publicar un mensaje en start-broadcast.")
+    loggearError("[PLAYER] Hubo un error al hacer Flush().")
   }
 }
 
 func stopBroadcast(){
   loggear("[REDIS] Publicando mensaje en stop-broadcast.")
   time.Sleep(2 * time.Second)
-  err := ClienteStop.Publish("stop-broadcast", "Detener Broadcast").Err()
+  ConnStop.Send("PUBLISH", "stop-broadcast","Detener Broadcast")
+  err := ConnStop.Flush()
   if err != nil {
-    loggearError("[STOPPER] Hubo un error al publicar un mensaje en stop-broadcast.")
+    loggearError("[STOPPER] Hubo un error al hacer Flush().")
   }
 }
 
@@ -121,54 +122,52 @@ func vlcLoader(){
 
 func playLooper(){
   for {
-    // Mensaje publicado
-    mensaje, err := PubSubPlay.ReceiveMessage()
-    if err != nil {
-      loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
-      panic(err)
+    switch m := PubSubPlay.Receive().(type) {
+      case redis.Message:
+        payload := string(m.Data[:])
+        loggear("[REDIS] Mensaje publicado: " + payload + ".")
+
+        // URI del archivo para VLC
+        file := "file://" + FirehousePath + payload
+
+        startBroadcast()
+
+        loggear("[PLAYER] Agregando " + FirehousePath + payload + " a la playlist de VLC.")
+        loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
+        io.WriteString(StdinVLC, "add " + file + "\n")
     }
-    loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
-
-    // URI del archivo para VLC
-    file := "file://" + FirehousePath + mensaje.Payload
-
-    startBroadcast()
-
-    loggear("[PLAYER] Agregando " + FirehousePath + mensaje.Payload + " a la playlist de VLC.")
-    loggear("[PLAYER] Intentando reproducir " + FirehousePath + mensaje.Payload)
-    io.WriteString(StdinVLC, "add " + file + "\n")
   }
 }
 
 func stopLooper(){
   for {
-    // Mensaje publicado
-    mensaje, err := PubSubStop.ReceiveMessage()
-    if err != nil {
-      loggearError("[REDIS] Hubo en error en la recepción de un mensaje publicado. Sistema dice: " + err.Error() + ".")
-      panic(err)
-    }
-    loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
+    switch m := PubSubStop.Receive().(type) {
+      case redis.Message:
+        payload := string(m.Data[:])
+        loggear("[REDIS] Mensaje publicado: " + payload + ".")
 
-    // bufio al rescate
-    bufaio := bufio.NewScanner(StdoutVLC)
+        // bufio al rescate
+        bufaio := bufio.NewScanner(StdoutVLC)
 
-    // Hacer is_playing
-    io.WriteString(StdinVLC, "is_playing\n")
+        // Hacer is_playing
+        io.WriteString(StdinVLC, "clear\n")
+        io.WriteString(StdinVLC, "is_playing\n")
 
-    for {
-      loggear("[BUFIO] Puedo hacer Scan(): " + strconv.FormatBool(bufaio.Scan()))
-      loggear("[BUFIO] Linea: " + bufaio.Text())
-      if ( bufaio.Text() == "0" || bufaio.Text() == "1" ) {
-        break
-      }
-    }
+        for {
+          loggear("[BUFIO] Puedo hacer Scan(): " + strconv.FormatBool(bufaio.Scan()))
+          loggear("[BUFIO] Linea: " + bufaio.Text())
 
-    if bufaio.Text() == "1" {
-      loggear("[BUFIO] Linea: " + bufaio.Text())
-      loggear("[STOPPER] Deteniendo playlist de VLC.")
-      io.WriteString(StdinVLC, "stop\n")
-      stopBroadcast()
+          if ( bufaio.Text() == "0" || bufaio.Text() == "1" ) {
+            break
+          }
+        }
+
+        if bufaio.Text() == "1" {
+          loggear("[BUFIO] Linea: " + bufaio.Text())
+          loggear("[STOPPER] Deteniendo playlist de VLC.")
+          io.WriteString(StdinVLC, "stop\n")
+          stopBroadcast()
+        }
     }
   }
 }
