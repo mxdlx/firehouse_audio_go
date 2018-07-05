@@ -108,6 +108,7 @@ func playLooper(){
   for {
     c := Piletazo.Get()
     psc := redis.PubSubConn{Conn: c}
+    psc.Subscribe("interventions:play_audio_file")
     switch m := psc.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
@@ -129,6 +130,7 @@ func stopLooper(){
   for {
     c := Piletazo.Get()
     psc := redis.PubSubConn{Conn: c}
+    psc.Subscribe("stop-broadcast")
     switch m := psc.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
