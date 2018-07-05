@@ -24,6 +24,8 @@ var (
   VLCLogPath = LogPath + "/vlc.log"
   StdinVLC io.WriteCloser
   StdoutVLC io.ReadCloser
+  PubSubPlay redis.PubSubConn
+  PubSubStop redis.PubSubConn
   Piletazo = newPool()
 )
 
@@ -43,6 +45,9 @@ func init() {
   }
 
   ErrorLog = log.New(fileHandlerE, "[ERROR] ", log.Ldate|log.Ltime)
+
+  PubSubPlay = redis.PubSubConn{Conn: Piletazo.Get()}
+  PubSubStop = redis.PubSubConn{Conn: Piletazo.Get()}
 }
 
 func loggear(mensaje string) {
@@ -55,12 +60,17 @@ func loggearError(mensaje string) {
 
 func newPool() *redis.Pool {
   return &redis.Pool{
-    MaxIdle: 5,
+    MaxIdle: 10,
     IdleTimeout: 240 * time.Second,
     Dial: func() (redis.Conn, error) {
       return redis.Dial("tcp", RedisHost + ":6379")
     },
   }
+}
+
+func subscribir(){
+  PubSubPlay.Subscribe("interventions:play_audio_file")
+  PubSubStop.Subscribe("stop-broadcast")
 }
 
 func startBroadcast(){
@@ -106,10 +116,7 @@ func vlcLoader(){
 
 func playLooper(){
   for {
-    c := Piletazo.Get()
-    psc := redis.PubSubConn{Conn: c}
-    psc.Subscribe("interventions:play_audio_file")
-    switch m := psc.Receive().(type) {
+    switch m := PubSubPlay.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
         loggear("[REDIS] Mensaje publicado: " + payload + ".")
@@ -122,16 +129,12 @@ func playLooper(){
         loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
         io.WriteString(StdinVLC, "add " + file + "\n")
     }
-    defer c.Close()
   }
 }
 
 func stopLooper(){
   for {
-    c := Piletazo.Get()
-    psc := redis.PubSubConn{Conn: c}
-    psc.Subscribe("stop-broadcast")
-    switch m := psc.Receive().(type) {
+    switch m := PubSubStop.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
         loggear("[REDIS] Mensaje publicado: " + payload + ".")
@@ -159,7 +162,6 @@ func stopLooper(){
           stopBroadcast()
         }
     }
-    defer c.Close()
   }
 }
 
