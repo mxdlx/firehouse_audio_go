@@ -1,12 +1,13 @@
 package main
 
 import (
-  "bytes"
+  "bufio"
   "github.com/go-redis/redis"
   "io"
   "log"
   "os"
   "os/exec"
+  "strconv"
   "sync"
   "time"
 )
@@ -73,7 +74,7 @@ func clienteRedis() *redis.Client {
 
 func subscribir() {
   PubSubPlay = ClientePlay.Subscribe("interventions:play_audio_file")
-  PubSubStop = ClienteStop.Subscribe("force-stop-broadcast")
+  PubSubStop = ClienteStop.Subscribe("stop-broadcast", "force-stop-broadcast")
 }
 
 func startBroadcast(){
@@ -112,17 +113,10 @@ func vlcLoader(){
 			  "--sout-keep",
 			  "--sout-mux-caching=10")
 
-  // Necesito compartir StdinVLC
-  var err1, err2 error
-  StdinVLC, err1 = handler.StdinPipe()
-  StdoutVLC, err2 = handler.StdoutPipe()
+  StdinVLC, _ = handler.StdinPipe()
+  StdoutVLC, _ = handler.StdoutPipe()
 
   handler.Start()
-
-  if err != nil {
-    loggearError("[PLAYER] Hubo un error en la ejecución de VLC. Sistema dice: " + err.Error() + ".")
-    panic(err)
-  }
 }
 
 func playLooper(){
@@ -136,7 +130,7 @@ func playLooper(){
     loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
 
     // URI del archivo para VLC
-    file := "file:// " + FirehousePath + mensaje.Payload
+    file := "file://" + FirehousePath + mensaje.Payload
 
     startBroadcast()
 
@@ -156,16 +150,25 @@ func stopLooper(){
     }
     loggear("[REDIS] Mensaje publicado: " + mensaje.String() + ".")
 
-    io.WriteString(StdinVLC, "is_playing\n")
-    buf := new(bytes.Buffer)
-    buf.ReadFrom(StdoutVLC)
+    // bufio al rescate
+    bufaio := bufio.NewScanner(StdoutVLC)
 
-    if buf.String() == "1" {
+    // Hacer is_playing
+    io.WriteString(StdinVLC, "is_playing\n")
+
+    for {
+      loggear("[BUFIO] Puedo hacer Scan(): " + strconv.FormatBool(bufaio.Scan()))
+      loggear("[BUFIO] Linea: " + bufaio.Text())
+      if ( bufaio.Text() == "0" || bufaio.Text() == "1" ) {
+        break
+      }
+    }
+
+    if bufaio.Text() == "1" {
+      loggear("[BUFIO] Linea: " + bufaio.Text())
       loggear("[STOPPER] Deteniendo playlist de VLC.")
       io.WriteString(StdinVLC, "stop\n")
       stopBroadcast()
-    } else {
-      loggear("[STOPPER] No hay elementos en reproduccion.")
     }
   }
 }
