@@ -24,6 +24,7 @@ var (
   VLCLogPath = LogPath + "/vlc.log"
   StdinVLC io.WriteCloser
   StdoutVLC io.ReadCloser
+  Piletazo = newPool()
 )
 
 func init() {
@@ -42,7 +43,6 @@ func init() {
   }
 
   ErrorLog = log.New(fileHandlerE, "[ERROR] ", log.Ldate|log.Ltime)
-
 }
 
 func loggear(mensaje string) {
@@ -53,24 +53,29 @@ func loggearError(mensaje string) {
   ErrorLog.Output(0, mensaje)
 }
 
-func connRedis() redis.Conn {
-  // Necesito tener esto acá por utilizar el cliente como una var
-  c, err := redis.Dial("tcp", RedisHost + ":6379")
-  if err != nil {
-    loggearError("[REDIS] No se pudo conectar al servidor de Redis.")
-    panic(err)
+func newPool() *redis.Pool {
+  return &redis.Pool{
+    MaxIdle: 5,
+    IdleTimeout: 240 * time.Second,
+    Dial: func() (redis.Conn, error) {
+      return redis.Dial("tcp", RedisHost + ":6379")
+    },
   }
-  //defer c.Close()
+}
 
-  return c
+func startBroadcast(){
+  c := Piletazo.Get()
+  loggear("[REDIS] Publicando mensaje en start-broadcast.")
+  time.Sleep(2 * time.Second)
+  c.Send("PUBLISH", "start-broadcast","Bravo Victor")
+  defer c.Close()
 }
 
 func stopBroadcast(){
-  c := connRedis()
-  loggear("[PLAYER] Estoy en stopBroadcast!")
+  c := Piletazo.Get()
   loggear("[REDIS] Publicando mensaje en stop-broadcast.")
   time.Sleep(2 * time.Second)
-  c.Send("PUBLISH", "stop-broadcast","Detener Broadcast")
+  c.Send("PUBLISH", "stop-broadcast","Mauricio Time")
   defer c.Close()
 }
 
@@ -100,43 +105,31 @@ func vlcLoader(){
 }
 
 func playLooper(){
-  c := connRedis()
-  PubSubPlay := redis.PubSubConn{Conn: c}
-  PubSubPlay.Subscribe("interventions:play_audio_file")
   for {
-    switch m := PubSubPlay.Receive().(type) {
+    c := Piletazo.Get()
+    psc := redis.PubSubConn{Conn: c}
+    switch m := psc.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
         loggear("[REDIS] Mensaje publicado: " + payload + ".")
 
-        start, err := redis.Dial("tcp", RedisHost + ":6379")
-        if err != nil {
-          loggearError("[REDIS] No se pudo conectar al servidor de Redis.")
-          panic(err)
-        }
-
-        loggear("[REDIS] Publicando mensaje en start-broadcast.")
-        time.Sleep(1 * time.Second)
-        start.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
-        defer start.Close()
-
         // URI del archivo para VLC
         file := "file://" + FirehousePath + payload
+	startBroadcast()
 
         loggear("[PLAYER] Agregando " + FirehousePath + payload + " a la playlist de VLC.")
         loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
         io.WriteString(StdinVLC, "add " + file + "\n")
     }
+    defer c.Close()
   }
-  defer c.Close()
 }
 
 func stopLooper(){
-  c := connRedis()
-  PubSubStop := redis.PubSubConn{Conn: c}
-  PubSubStop.Subscribe("stop-broadcast", "force-stop-broadcast")
   for {
-    switch m := PubSubStop.Receive().(type) {
+    c := Piletazo.Get()
+    psc := redis.PubSubConn{Conn: c}
+    switch m := psc.Receive().(type) {
       case redis.Message:
         payload := string(m.Data[:])
         loggear("[REDIS] Mensaje publicado: " + payload + ".")
@@ -164,8 +157,8 @@ func stopLooper(){
           stopBroadcast()
         }
     }
+    defer c.Close()
   }
-  defer c.Close()
 }
 
 func main() {
