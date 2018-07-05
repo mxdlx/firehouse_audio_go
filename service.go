@@ -109,14 +109,19 @@ func playLooper(){
         payload := string(m.Data[:])
         loggear("[REDIS] Mensaje publicado: " + payload + ".")
 
-        // URI del archivo para VLC
-        file := "file://" + FirehousePath + payload
+        start, err := redis.Dial("tcp", RedisHost + ":6379")
+        if err != nil {
+          loggearError("[REDIS] No se pudo conectar al servidor de Redis.")
+          panic(err)
+        }
 
-        start := connRedis()
         loggear("[REDIS] Publicando mensaje en start-broadcast.")
         time.Sleep(1 * time.Second)
         start.Send("PUBLISH", "start-broadcast", "Iniciar Broadcast")
         defer start.Close()
+
+        // URI del archivo para VLC
+        file := "file://" + FirehousePath + payload
 
         loggear("[PLAYER] Agregando " + FirehousePath + payload + " a la playlist de VLC.")
         loggear("[PLAYER] Intentando reproducir " + FirehousePath + payload)
