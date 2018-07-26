@@ -152,14 +152,14 @@ func stopLooper(){
         io.WriteString(StdinVLC, "clear\n")
         io.WriteString(StdinVLC, "is_playing\n")
 
-        for {
+	for {
           loggear("[BUFIO] Puedo hacer Scan(): " + strconv.FormatBool(bufaio.Scan()))
           loggear("[BUFIO] Linea: " + bufaio.Text())
 
-          if ( bufaio.Text() == "0" || bufaio.Text() == "1" ) {
-            break
-          }
-        }
+	  if ( bufaio.Text() == "0" || bufaio.Text() == "1" ) {
+	    break
+	  }
+	}
 
         if bufaio.Text() == "1" {
           loggear("[BUFIO] Linea: " + bufaio.Text())
