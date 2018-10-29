@@ -7,8 +7,8 @@ services:
     environment:
       - logs_path=/logs
       - firehouse_path=/firehouse
-      - BROADCAST_IP=10.90.9.255
-      - REDIS_HOST=10.90.9.145
+      - BROADCAST_IP=
+      - REDIS_HOST=
     user: vlc
     volumes:
       - ./logs:/logs:rw
@@ -25,7 +25,7 @@ services:
   redigo:
     image: rediscommander/redis-commander
     environment:
-      - REDIS_HOST=10.90.9.145
+      - REDIS_HOST=
     ports:
       - "8081:8081"
 
